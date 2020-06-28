@@ -232,6 +232,79 @@ func TestReturnsErrorWhenTLSSecretDoesNotExist(t *testing.T) {
 	assert.Error(t, err, fmt.Sprintf("secrets \"%s\" not found", tlsSecretName))
 }
 
+func TestIngressWithHeaderMatch(t *testing.T) {
+	ingress := v1alpha1.Ingress{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "Ingress",
+			APIVersion: "networking.internal.knative.dev/v1alpha1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: "hello-world",
+		},
+		Spec: v1alpha1.IngressSpec{
+			Rules: []v1alpha1.IngressRule{
+				{
+					HTTP: &v1alpha1.HTTPIngressRuleValue{
+						Paths: []v1alpha1.HTTPIngressPath{
+							{
+								Headers: map[string]v1alpha1.HeaderMatch{
+									"Knative-Serving-Tag": {
+										Exact: "rev1",
+									},
+								},
+								Splits: []v1alpha1.IngressBackendSplit{
+									{
+										IngressBackend: v1alpha1.IngressBackend{
+											ServiceNamespace: "default",
+											ServiceName:      "hello-world-rev1",
+											ServicePort: intstr.IntOrString{
+												Type:   intstr.Int,
+												IntVal: 80,
+											},
+										},
+										Percent: 100,
+										AppendHeaders: map[string]string{
+											"Knative-Serving-Namespace": "default",
+											"Knative-Serving-Revision":  "hello-world-rev1",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Status: v1alpha1.IngressStatus{},
+	}
+
+	kubeClient := fake.NewSimpleClientset()
+	// Create the Kubernetes services associated to the Knative services that
+	// appear in the ingress above
+	if err := createServicesWithNames(
+		kubeClient,
+		[]string{"hello-world-rev1"},
+		"default",
+	); err != nil {
+		t.Error(err)
+	}
+
+	ingressTranslator := NewIngressTranslator(
+		kubeClient, newMockedEndpointsLister(), "cluster.local", &pkgtest.FakeTracker{}, logtest.TestLogger(t))
+
+	ingressTranslation, err := ingressTranslator.translateIngress(&ingress, false)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 1, len(ingressTranslation.routes))
+
+	// Check that there are 2 weighted clusters for the route
+	envoyRoute := ingressTranslation.routes[0]
+	assert.Equal(t, 1, len(envoyRoute.GetMatch().Headers))
+	assert.Equal(t, "Knative-Serving-Tag", envoyRoute.GetMatch().Headers[0].Name)
+	assert.Equal(t, "rev1", envoyRoute.GetMatch().Headers[0].GetExactMatch())
+}
+
 func newMockedEndpointsLister() corev1listers.EndpointsLister {
 	return new(endpointsLister)
 }

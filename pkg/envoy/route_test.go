@@ -63,6 +63,23 @@ func TestNewRouteWithoutRetry(t *testing.T) {
 	assert.Assert(t, r.GetRoute().RetryPolicy == nil)
 }
 
+func TestRouteWithHeaderMatch(t *testing.T) {
+
+	name := "testRoute_12345"
+	path := "/my_route"
+	AppendHeaders := map[string]string{}
+	var wrs []*envoy_api_v2_route.WeightedCluster_ClusterWeight
+	headerMatchers := []*envoy_api_v2_route.HeaderMatcher{{
+		Name: "test-header",
+		HeaderMatchSpecifier: &envoy_api_v2_route.HeaderMatcher_ExactMatch{
+			ExactMatch: "test-value",
+		},
+	}}
+	r := NewRoute(name, path, headerMatchers, wrs, 0, uint32(0), 0, AppendHeaders)
+	assert.Equal(t, "test-header", r.GetMatch().Headers[0].Name)
+	assert.Equal(t, "test-value", r.GetMatch().Headers[0].GetExactMatch())
+}
+
 func TestNewRouteStatusOK(t *testing.T) {
 
 	name := "testRoute_12345"
