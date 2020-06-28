@@ -254,8 +254,23 @@ func createRouteForRevision(ingressName string, ingressNamespace string, httpPat
 		}
 	}
 
+	// Translate `headers` field of httpPath
+	// Currently, only exact header matching is provided by KIngress
+	var headerMatchers []*route.HeaderMatcher = nil
+	if httpPath.Headers != nil {
+		headerMatchers = make([]*route.HeaderMatcher, 0, len(httpPath.Headers))
+		for headerName, headerValue := range httpPath.Headers {
+			headerMatchers = append(headerMatchers, &route.HeaderMatcher{
+				Name: headerName,
+				HeaderMatchSpecifier: &route.HeaderMatcher_ExactMatch{
+					ExactMatch: headerValue.Exact,
+				},
+			})
+		}
+	}
+
 	return envoy.NewRoute(
-		routeName, path, wrs, routeTimeout, uint32(attempts), perTryTimeout, httpPath.AppendHeaders,
+		routeName, path, headerMatchers, wrs, routeTimeout, uint32(attempts), perTryTimeout, httpPath.AppendHeaders,
 	)
 }
 

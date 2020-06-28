@@ -40,7 +40,7 @@ func TestNewRouteWithRetry(t *testing.T) {
 	}
 
 	var wrs []*envoy_api_v2_route.WeightedCluster_ClusterWeight
-	r := NewRoute(name, path, wrs, routeTimeout, uint32(attempts), perTryTimeout, AppendHeaders)
+	r := NewRoute(name, path, nil, wrs, routeTimeout, uint32(attempts), perTryTimeout, AppendHeaders)
 
 	assert.Equal(t, r.Name, name)
 	assert.Equal(t, r.RequestHeadersToAdd[0].GetHeader().GetKey(), headerName)
@@ -59,7 +59,7 @@ func TestNewRouteWithoutRetry(t *testing.T) {
 	AppendHeaders := map[string]string{}
 	var wrs []*envoy_api_v2_route.WeightedCluster_ClusterWeight
 
-	r := NewRoute(name, path, wrs, 0, uint32(0), 0, AppendHeaders)
+	r := NewRoute(name, path, nil, wrs, 0, uint32(0), 0, AppendHeaders)
 	assert.Assert(t, r.GetRoute().RetryPolicy == nil)
 }
 
